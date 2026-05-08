@@ -1,15 +1,12 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import requests
-import time
+
 
 st.set_page_config(page_title="AI Portfolio Dashboard", layout="wide")
 
 st.title("🚀 AI Portfolio Dashboard")
 st.markdown("لوحة تحليل حقيقية لمحفظتك")
-
-API_KEY = st.sidebar.text_input("Alpha Vantage API Key", type="password")
 
 portfolio = [
     {"Symbol": "PRPH", "Quantity": 2107, "Buy": 2.50},
@@ -23,38 +20,31 @@ portfolio = [
     {"Symbol": "TRIXF", "Quantity": 2000, "Buy": 1.10},
 ]
 
-@st.cache_data(ttl=300)
-def get_price(symbol, api_key):
-    url = "https://www.alphavantage.co/query"
-    params = {
-        "function": "GLOBAL_QUOTE",
-        "symbol": symbol,
-        "apikey": api_key
-    }
+import yfinance as yf
+
+def get_price(symbol, market="US"):
 
     try:
-        r = requests.get(url, params=params, timeout=20)
-        data = r.json()
-        quote = data.get("Global Quote", {})
+        if market == "SA":
+            symbol = f"{symbol}.SR"
 
-        if not quote:
+        stock = yf.Ticker(symbol)
+        hist = stock.history(period="1d")
+
+        if hist.empty:
             return None
 
-        return float(quote["05. price"])
+        return float(hist["Close"].iloc[-1])
 
     except:
         return None
-
-if not API_KEY:
-    st.warning("ضع مفتاح Alpha Vantage من الشريط الجانبي.")
-    st.stop()
-
 rows = []
 
 for stock in portfolio:
     symbol = stock["Symbol"]
-    price = get_price(symbol, API_KEY)
-    time.sleep(12)
+    
+market = stock.get("Market", "US")
+price = get_price(symbol, market)
 
     if price is None:
         rows.append({
