@@ -1,113 +1,144 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-import plotly.graph_objects as go
+import requests
+import time
 
-st.set_page_config(
-    page_title="AI Portfolio Dashboard",
-    layout="wide"
-)
-
-# =========================
-# بيانات المحفظة
-# =========================
-
-data = [
-    {"Symbol": "PRPH", "Profit %": -82, "Value": 320},
-    {"Symbol": "CMND", "Profit %": -75, "Value": 410},
-    {"Symbol": "OCG", "Profit %": -66, "Value": 530},
-    {"Symbol": "EZRA", "Profit %": -85, "Value": 250},
-    {"Symbol": "PASW", "Profit %": -48, "Value": 120},
-    {"Symbol": "TNON", "Profit %": -12, "Value": 600},
-]
-
-df = pd.DataFrame(data)
-
-# =========================
-# العنوان
-# =========================
+st.set_page_config(page_title="AI Portfolio Dashboard", layout="wide")
 
 st.title("🚀 AI Portfolio Dashboard")
-st.markdown("### لوحة تحليل ذكية لمحفظة الأسهم")
+st.markdown("لوحة تحليل حقيقية لمحفظتك")
 
-# =========================
-# الإحصائيات
-# =========================
+API_KEY = st.sidebar.text_input("Alpha Vantage API Key", type="password")
 
+portfolio = [
+    {"Symbol": "PRPH", "Quantity": 2107, "Buy": 2.50},
+    {"Symbol": "CMND", "Quantity": 321, "Buy": 8.28},
+    {"Symbol": "OCG", "Quantity": 653, "Buy": 5.58},
+    {"Symbol": "KUST", "Quantity": 184, "Buy": 14.91},
+    {"Symbol": "EZRA", "Quantity": 1000, "Buy": 0.5528},
+    {"Symbol": "PASW", "Quantity": 234, "Buy": 0.2964},
+    {"Symbol": "TNON", "Quantity": 167, "Buy": 0.8688},
+    {"Symbol": "SMX", "Quantity": 3, "Buy": 1.37},
+    {"Symbol": "TRIXF", "Quantity": 2000, "Buy": 1.10},
+]
+
+@st.cache_data(ttl=300)
+def get_price(symbol, api_key):
+    url = "https://www.alphavantage.co/query"
+    params = {
+        "function": "GLOBAL_QUOTE",
+        "symbol": symbol,
+        "apikey": api_key
+    }
+
+    try:
+        r = requests.get(url, params=params, timeout=20)
+        data = r.json()
+        quote = data.get("Global Quote", {})
+
+        if not quote:
+            return None
+
+        return float(quote["05. price"])
+
+    except:
+        return None
+
+if not API_KEY:
+    st.warning("ضع مفتاح Alpha Vantage من الشريط الجانبي.")
+    st.stop()
+
+rows = []
+
+for stock in portfolio:
+    symbol = stock["Symbol"]
+    price = get_price(symbol, API_KEY)
+    time.sleep(12)
+
+    if price is None:
+        rows.append({
+            "Symbol": symbol,
+            "Quantity": stock["Quantity"],
+            "Buy": stock["Buy"],
+            "Current": None,
+            "Cost": stock["Quantity"] * stock["Buy"],
+            "Value": 0,
+            "Profit": 0,
+            "Profit %": 0,
+            "Status": "لم يتم جلب السعر"
+        })
+        continue
+
+    cost = stock["Quantity"] * stock["Buy"]
+    value = stock["Quantity"] * price
+    profit = value - cost
+    profit_pct = (profit / cost) * 100
+
+    rows.append({
+        "Symbol": symbol,
+        "Quantity": stock["Quantity"],
+        "Buy": stock["Buy"],
+        "Current": price,
+        "Cost": cost,
+        "Value": value,
+        "Profit": profit,
+        "Profit %": profit_pct,
+        "Status": "تم"
+    })
+
+df = pd.DataFrame(rows)
+
+total_cost = df["Cost"].sum()
 total_value = df["Value"].sum()
-avg_profit = df["Profit %"].mean()
+total_profit = total_value - total_cost
+total_pct = (total_profit / total_cost) * 100 if total_cost else 0
 
 col1, col2, col3 = st.columns(3)
+col1.metric("💰 قيمة المحفظة", f"${total_value:,.2f}")
+col2.metric("📉 الربح / الخسارة", f"${total_profit:,.2f}", f"{total_pct:.2f}%")
+col3.metric("💵 إجمالي التكلفة", f"${total_cost:,.2f}")
 
-col1.metric("💰 قيمة المحفظة", f"${total_value}")
-col2.metric("📉 متوسط الأداء", f"{avg_profit:.1f}%")
-col3.metric("📊 عدد الأسهم", len(df))
+st.subheader("📈 توزيع المحفظة")
 
-# =========================
-# الرسم الدائري
-# =========================
-
-pie = px.pie(
-    df,
-    names="Symbol",
+fig = px.pie(
+    df[df["Value"] > 0],
     values="Value",
-    hole=0.5,
-    title="توزيع المحفظة"
+    names="Symbol",
+    hole=0.5
 )
+st.plotly_chart(fig, use_container_width=True)
 
-st.plotly_chart(pie, use_container_width=True)
+st.subheader("📊 أداء الأسهم")
 
-# =========================
-# الرسم البياني للأداء
-# =========================
-
-bar = px.bar(
+fig2 = px.bar(
     df,
     x="Symbol",
     y="Profit %",
     color="Profit %",
-    title="أداء الأسهم",
-    text="Profit %"
+    text=df["Profit %"].round(2)
 )
-
-st.plotly_chart(bar, use_container_width=True)
-
-# =========================
-# تحليل ذكي
-# =========================
-
-worst_stock = df.loc[df["Profit %"].idxmin()]
-best_stock = df.loc[df["Profit %"].idxmax()]
+st.plotly_chart(fig2, use_container_width=True)
 
 st.subheader("🧠 التحليل الذكي")
 
-st.error(
-    f"أعلى سهم خطورة: {worst_stock['Symbol']} "
-    f"({worst_stock['Profit %']}%)"
-)
+worst = df.sort_values("Profit %").head(3)
+best = df.sort_values("Profit %", ascending=False).head(3)
 
-st.success(
-    f"أفضل سهم بالمحفظة: {best_stock['Symbol']} "
-    f"({best_stock['Profit %']}%)"
-)
+st.error("أعلى الأسهم خطورة:")
+st.dataframe(worst[["Symbol", "Profit %", "Profit", "Status"]], use_container_width=True)
 
-# =========================
-# الجدول
-# =========================
+st.success("أفضل الأسهم أداء:")
+st.dataframe(best[["Symbol", "Profit %", "Profit", "Status"]], use_container_width=True)
 
 st.subheader("📋 تفاصيل المحفظة")
-
 st.dataframe(df, use_container_width=True)
 
-# =========================
-# التقييم النهائي
-# =========================
-
-if avg_profit < -50:
-    st.warning("⚠️ المحفظة تحتاج إعادة هيكلة وتقليل المخاطر")
-elif avg_profit < -20:
-    st.info("📊 المحفظة متوسطة الخطورة")
+if total_pct < -50:
+    st.warning("⚠️ المحفظة عالية الخطورة وتحتاج مراجعة قوية.")
+elif total_pct < -20:
+    st.info("📊 المحفظة تحت ضغط وتحتاج متابعة.")
 else:
-    st.success("✅ أداء المحفظة جيد")
+    st.success("✅ الوضع العام أفضل نسبياً.")
 
-st.caption("تم إنشاء هذه اللوحة بواسطة الذكاء الاصطناعي")
+st.caption("تحليل آلي تعليمي وليس توصية مالية.")
