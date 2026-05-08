@@ -45,8 +45,7 @@ for stock in portfolio:
     
 market = stock.get("Market", "US")
 price = get_price(symbol, market)
-
-    if price is None:
+if price is None:
         rows.append({
             "Symbol": symbol,
             "Quantity": stock["Quantity"],
