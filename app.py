@@ -39,13 +39,17 @@ def get_price(symbol, market="US"):
     except:
         return None
 rows = []
+rows = []
 
 for stock in portfolio:
+
     symbol = stock["Symbol"]
-    
-market = stock.get("Market", "US")
-price = get_price(symbol, market)
-if price is None:
+    market = stock.get("Market", "US")
+
+    price = get_price(symbol, market)
+
+    if price is None:
+
         rows.append({
             "Symbol": symbol,
             "Quantity": stock["Quantity"],
@@ -57,11 +61,15 @@ if price is None:
             "Profit %": 0,
             "Status": "لم يتم جلب السعر"
         })
+
         continue
 
     cost = stock["Quantity"] * stock["Buy"]
+
     value = stock["Quantity"] * price
+
     profit = value - cost
+
     profit_pct = (profit / cost) * 100
 
     rows.append({
@@ -75,6 +83,7 @@ if price is None:
         "Profit %": profit_pct,
         "Status": "تم"
     })
+
 
 df = pd.DataFrame(rows)
 
