@@ -17,7 +17,7 @@ portfolio = [
     {"Symbol": "PASW", "Quantity": 234, "Buy": 0.2964},
     {"Symbol": "TNON", "Quantity": 167, "Buy": 0.8688},
     {"Symbol": "SMX", "Quantity": 3, "Buy": 1.37},
-    {"Symbol": "TRIXF", "Quantity": 2000, "Buy": 1.10},
+    
 ]
 
 import yfinance as yf
