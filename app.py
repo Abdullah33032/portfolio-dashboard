@@ -10,7 +10,20 @@ SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=cs
 
 st.title("🚀 AI Portfolio Dashboard")
 st.markdown("لوحة احترافية تقرأ عملياتك من Google Sheets")
+st.sidebar.header("➕ إضافة صفقة جديدة")
 
+new_date = st.sidebar.date_input("التاريخ")
+new_type = st.sidebar.selectbox("نوع العملية", ["BUY", "SELL"])
+new_symbol = st.sidebar.text_input("رمز السهم", placeholder="PRPH أو 2222")
+new_market = st.sidebar.selectbox("السوق", ["US", "SA"])
+new_quantity = st.sidebar.number_input("الكمية", min_value=0.0, step=1.0)
+new_price = st.sidebar.number_input("السعر", min_value=0.0, step=0.01)
+new_fees = st.sidebar.number_input("الرسوم", min_value=0.0, step=0.01)
+
+if st.sidebar.button("جهّز الصف"):
+    row = f"{new_date},{new_type},{new_symbol.upper().strip()},{new_market},{new_quantity},{new_price},{new_fees}"
+    st.sidebar.success("انسخ هذا الصف والصقه في Google Sheet:")
+    st.sidebar.code(row)
 @st.cache_data(ttl=300)
 def load_transactions():
     df = pd.read_csv(SHEET_URL)
