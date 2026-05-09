@@ -20,10 +20,23 @@ new_quantity = st.sidebar.number_input("الكمية", min_value=0.0, step=1.0)
 new_price = st.sidebar.number_input("السعر", min_value=0.0, step=0.01)
 new_fees = st.sidebar.number_input("الرسوم", min_value=0.0, step=0.01)
 
-if st.sidebar.button("جهّز الصف"):
-    row = f"{new_date},{new_type},{new_symbol.upper().strip()},{new_market},{new_quantity},{new_price},{new_fees}"
-    st.sidebar.success("انسخ هذا الصف والصقه في Google Sheet:")
-    st.sidebar.code(row)
+if st.sidebar.button("إضافة الصفقة"):
+
+    new_row = pd.DataFrame([{
+        "Date": str(new_date),
+        "Type": new_type,
+        "Symbol": new_symbol.upper().strip(),
+        "Market": new_market,
+        "Quantity": new_quantity,
+        "Price": new_price,
+        "Fees": new_fees
+    }])
+
+    df = pd.concat([df, new_row], ignore_index=True)
+
+    st.sidebar.success("تمت إضافة الصفقة بنجاح ✅")
+
+    st.dataframe(new_row)
 @st.cache_data(ttl=300)
 def load_transactions():
     df = pd.read_csv(SHEET_URL)
