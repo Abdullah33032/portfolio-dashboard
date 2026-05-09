@@ -48,8 +48,6 @@ if st.sidebar.button("إضافة الصفقة"):
         float(new_fees)
     ]
     sheet.append_row(new_row)
-st.cache_data.clear()
-st.rerun()
 
 st.sidebar.success("تمت إضافة الصفقة تلقائياً ✅")
 @st.cache_data(ttl=300)
