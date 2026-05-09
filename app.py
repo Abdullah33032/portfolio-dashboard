@@ -1,91 +1,91 @@
 import streamlit as st
 import pandas as pd
 import plotly.express as px
-
+import yfinance as yf
 
 st.set_page_config(page_title="AI Portfolio Dashboard", layout="wide")
 
+SHEET_ID = "1-mdVLqNWMMRrbz3mS18gB5MVx-b0-YlvNdPzojoPaaQ"
+SHEET_URL = f"https://docs.google.com/spreadsheets/d/{SHEET_ID}/export?format=csv&gid=0"
+
 st.title("🚀 AI Portfolio Dashboard")
-st.markdown("لوحة تحليل حقيقية لمحفظتك")
+st.markdown("لوحة احترافية تقرأ عملياتك من Google Sheets")
 
-portfolio = [
-    {"Symbol": "PRPH", "Quantity": 2107, "Buy": 2.50},
-    {"Symbol": "CMND", "Quantity": 321, "Buy": 8.28},
-    {"Symbol": "OCG", "Quantity": 653, "Buy": 5.58},
-    {"Symbol": "KUST", "Quantity": 184, "Buy": 14.91},
-    {"Symbol": "EZRA", "Quantity": 1000, "Buy": 0.5528},
-    {"Symbol": "PASW", "Quantity": 234, "Buy": 0.2964},
-    {"Symbol": "TNON", "Quantity": 167, "Buy": 0.8688},
-    {"Symbol": "SMX", "Quantity": 3, "Buy": 1.37},
-    
-]
+@st.cache_data(ttl=300)
+def load_transactions():
+    df = pd.read_csv(SHEET_URL)
+    df["Symbol"] = df["Symbol"].astype(str).str.upper().str.strip()
+    df["Type"] = df["Type"].astype(str).str.upper().str.strip()
+    df["Market"] = df["Market"].astype(str).str.upper().str.strip()
+    df["Quantity"] = pd.to_numeric(df["Quantity"], errors="coerce").fillna(0)
+    df["Price"] = pd.to_numeric(df["Price"], errors="coerce").fillna(0)
+    df["Fees"] = pd.to_numeric(df["Fees"], errors="coerce").fillna(0)
+    return df
 
-import yfinance as yf
-
-def get_price(symbol, market="US"):
-
+@st.cache_data(ttl=300)
+def get_price(symbol, market):
     try:
-        if market == "SA":
-            symbol = f"{symbol}.SR"
-
-        stock = yf.Ticker(symbol)
-        hist = stock.history(period="1d")
-
-        if hist.empty:
+        ticker = f"{symbol}.SR" if market == "SA" else symbol
+        data = yf.Ticker(ticker).history(period="1d")
+        if data.empty:
             return None
-
-        return float(hist["Close"].iloc[-1])
-
+        return float(data["Close"].iloc[-1])
     except:
         return None
-rows = []
-rows = []
 
-for stock in portfolio:
+transactions = load_transactions()
 
-    symbol = stock["Symbol"]
-    market = stock.get("Market", "US")
+positions = []
 
-    price = get_price(symbol, market)
+for symbol in transactions["Symbol"].unique():
+    tx = transactions[transactions["Symbol"] == symbol]
+    market = tx["Market"].iloc[-1]
 
-    if price is None:
+    buy_qty = tx[tx["Type"] == "BUY"]["Quantity"].sum()
+    sell_qty = tx[tx["Type"] == "SELL"]["Quantity"].sum()
+    quantity = buy_qty - sell_qty
 
-        rows.append({
-            "Symbol": symbol,
-            "Quantity": stock["Quantity"],
-            "Buy": stock["Buy"],
-            "Current": None,
-            "Cost": stock["Quantity"] * stock["Buy"],
-            "Value": 0,
-            "Profit": 0,
-            "Profit %": 0,
-            "Status": "لم يتم جلب السعر"
-        })
-
+    if quantity <= 0:
         continue
 
-    cost = stock["Quantity"] * stock["Buy"]
+    buy_cost = (
+        tx[tx["Type"] == "BUY"]["Quantity"] * tx[tx["Type"] == "BUY"]["Price"]
+    ).sum()
 
-    value = stock["Quantity"] * price
+    buy_fees = tx[tx["Type"] == "BUY"]["Fees"].sum()
+    avg_buy = (buy_cost + buy_fees) / buy_qty if buy_qty else 0
 
+    current = get_price(symbol, market)
+
+    if current is None:
+        current = 0
+        status = "لم يتم جلب السعر"
+    else:
+        status = "تم"
+
+    cost = quantity * avg_buy
+    value = quantity * current
     profit = value - cost
+    profit_pct = (profit / cost) * 100 if cost else 0
 
-    profit_pct = (profit / cost) * 100
-
-    rows.append({
+    positions.append({
         "Symbol": symbol,
-        "Quantity": stock["Quantity"],
-        "Buy": stock["Buy"],
-        "Current": price,
+        "Market": market,
+        "Quantity": quantity,
+        "Avg Buy": avg_buy,
+        "Current": current,
         "Cost": cost,
         "Value": value,
         "Profit": profit,
         "Profit %": profit_pct,
-        "Status": "تم"
+        "Status": status
     })
 
+df = pd.DataFrame(positions)
 
-df = pd.DataFrame(rows)
+if df.empty:
+    st.warning("لا توجد مراكز مفتوحة في Google Sheet.")
+    st.stop()
 
 total_cost = df["Cost"].sum()
 total_value = df["Value"].sum()
@@ -98,39 +98,28 @@ col2.metric("📉 الربح / الخسارة", f"${total_profit:,.2f}", f"{tota
 col3.metric("💵 إجمالي التكلفة", f"${total_cost:,.2f}")
 
 st.subheader("📈 توزيع المحفظة")
-
-fig = px.pie(
-    df[df["Value"] > 0],
-    values="Value",
-    names="Symbol",
-    hole=0.5
-)
+fig = px.pie(df[df["Value"] > 0], values="Value", names="Symbol", hole=0.5)
 st.plotly_chart(fig, use_container_width=True)
 
 st.subheader("📊 أداء الأسهم")
-
-fig2 = px.bar(
-    df,
-    x="Symbol",
-    y="Profit %",
-    color="Profit %",
-    text=df["Profit %"].round(2)
-)
+fig2 = px.bar(df, x="Symbol", y="Profit %", color="Profit %", text=df["Profit %"].round(2))
 st.plotly_chart(fig2, use_container_width=True)
 
 st.subheader("🧠 التحليل الذكي")
-
 worst = df.sort_values("Profit %").head(3)
 best = df.sort_values("Profit %", ascending=False).head(3)
 
-st.error("أعلى الأسهم خطورة:")
+st.error("أعلى الأسهم خطورة")
 st.dataframe(worst[["Symbol", "Profit %", "Profit", "Status"]], use_container_width=True)
 
-st.success("أفضل الأسهم أداء:")
+st.success("أفضل الأسهم أداء")
 st.dataframe(best[["Symbol", "Profit %", "Profit", "Status"]], use_container_width=True)
 
 st.subheader("📋 تفاصيل المحفظة")
 st.dataframe(df, use_container_width=True)
+
+st.subheader("🧾 سجل العمليات")
+st.dataframe(transactions, use_container_width=True)
 
 if total_pct < -50:
     st.warning("⚠️ المحفظة عالية الخطورة وتحتاج مراجعة قوية.")
