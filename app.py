@@ -20,23 +20,37 @@ new_quantity = st.sidebar.number_input("الكمية", min_value=0.0, step=1.0)
 new_price = st.sidebar.number_input("السعر", min_value=0.0, step=0.01)
 new_fees = st.sidebar.number_input("الرسوم", min_value=0.0, step=0.01)
 
+from google.oauth2.service_account import Credentials
+import gspread
+
+scope = [
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive"
+]
+
+creds = Credentials.from_service_account_info(
+    st.secrets["gcp_service_account"],
+    scopes=scope
+)
+
+client = gspread.authorize(creds)
+
+sheet = client.open_by_key(SHEET_ID).sheet1
+
 if st.sidebar.button("إضافة الصفقة"):
+    new_row = [
+        str(new_date),
+        new_type,
+        new_symbol.upper(),
+        new_market,
+        float(new_quantity),
+        float(new_price),
+        float(new_fees)
+    ]
 
-    new_row = pd.DataFrame([{
-        "Date": str(new_date),
-        "Type": new_type,
-        "Symbol": new_symbol.upper().strip(),
-        "Market": new_market,
-        "Quantity": new_quantity,
-        "Price": new_price,
-        "Fees": new_fees
-    }])
+    sheet.append_row(new_row)
 
-    df = pd.concat([df, new_row], ignore_index=True)
-
-    st.sidebar.success("تمت إضافة الصفقة بنجاح ✅")
-
-    st.dataframe(new_row)
+    st.sidebar.success("تمت إضافة الصفقة تلقائياً ✅")
 @st.cache_data(ttl=300)
 def load_transactions():
     df = pd.read_csv(SHEET_URL)
