@@ -47,11 +47,11 @@ if st.sidebar.button("إضافة الصفقة"):
         float(new_price),
         float(new_fees)
     ]
-
     sheet.append_row(new_row)
 st.cache_data.clear()
 st.rerun()
-    st.sidebar.success("تمت إضافة الصفقة تلقائياً ✅")
+
+st.sidebar.success("تمت إضافة الصفقة تلقائياً ✅")
 @st.cache_data(ttl=300)
 def load_transactions():
     df = pd.read_csv(SHEET_URL)
